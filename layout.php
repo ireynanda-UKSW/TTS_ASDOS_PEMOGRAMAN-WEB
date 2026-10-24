@@ -5,7 +5,7 @@ function head($judul) { ?>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= e($judul) ?> | Sirkuit</title>
+<title><?= e($judul) ?> | simakomputer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -13,7 +13,7 @@ function head($judul) { ?>
 </head>
 <body>
 <header class="bar">
-  <a class="logo" href="index.php">sirkuit<span>.</span></a>
+  <a class="logo" href="index.php">simakomputer<span>.</span></a>
   <nav>
     <a href="index.php">Katalog</a>
     <a href="keranjang.php">Keranjang <span class="badge"><?= jumlah_keranjang() ?></span></a>
@@ -24,7 +24,7 @@ function head($judul) { ?>
 
 function foot() { ?>
 </main>
-<footer class="foot">Sirkuit, toko komputer. <a href="admin.php">Admin</a></footer>
+<footer class="foot">simakomputer, toko komputer. <a href="admin.php">Admin</a></footer>
 </body>
 </html>
 <?php }
