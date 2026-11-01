@@ -1,6 +1,5 @@
 # 👥 Daftar Anggota Kelompok
 
-Berikut adalah daftar nama anggota kelompok kami beserta NIM masing-masing:
 
 | No. | Nama Lengkap | NIM |
 | :---: | :--- | :---: |
