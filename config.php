@@ -17,20 +17,22 @@ $pdo = new PDO(
     [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
 );
 
+if (!$pdo->query("SHOW COLUMNS FROM produk LIKE 'foto'")->fetch()) {
+    $pdo->exec('ALTER TABLE produk ADD foto VARCHAR(500) NULL AFTER spesifikasi');
+}
+
 function e($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function rp($n) { return 'Rp ' . number_format((float)$n, 0, ',', '.'); }
 function jumlah_keranjang() { return array_sum($_SESSION['cart'] ?? []); }
 
-// Simpan foto ke folder uploads/. Mengembalikan nama file, atau null jika tidak ada/gagal.
-function simpan_foto($f) {
-    if (!$f || $f['error'] !== UPLOAD_ERR_OK || $f['size'] > 2 * 1024 * 1024) return null; // maks 2 MB
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
-    $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$mime] ?? null;
-    if (!$ext) return null; // hanya JPG/PNG/WEBP
-    $nama = bin2hex(random_bytes(8)) . '.' . $ext;
-    return move_uploaded_file($f['tmp_name'], __DIR__ . '/uploads/' . $nama) ? $nama : null;
-}
-
-function hapus_foto($nama) {
-    if ($nama && is_file(__DIR__ . '/uploads/' . basename($nama))) unlink(__DIR__ . '/uploads/' . basename($nama));
+// Validasi link foto (harus http/https). Mengembalikan link, atau null jika kosong/tidak valid.
+// Alasan gagal disimpan di $_SESSION['flash'] supaya ditampilkan di admin.
+function simpan_link($u) {
+    $u = trim((string)$u);
+    if ($u === '') return null;
+    if (strlen($u) > 500 || !preg_match('#^https?://#i', $u) || !filter_var($u, FILTER_VALIDATE_URL)) {
+        $_SESSION['flash'] = 'Link foto tidak valid. Harus diawali http:// atau https:// dan maksimal 500 karakter.';
+        return null;
+    }
+    return $u;
 }

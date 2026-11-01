@@ -30,7 +30,7 @@ $tab = ($_GET['tab'] ?? 'produk') === 'pesanan' ? 'pesanan' : 'produk';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['tambah'])) {
-        $foto = simpan_foto($_FILES['foto'] ?? null);
+        $foto = simpan_link($_POST['foto_url'] ?? '');
         $pdo->prepare('INSERT INTO produk (kategori_id, nama, merek, spesifikasi, harga, stok, foto) VALUES (?,?,?,?,?,?,?)')
             ->execute([(int)$_POST['kategori_id'], trim($_POST['nama']), trim($_POST['merek']), trim($_POST['spesifikasi']), (int)$_POST['harga'], (int)$_POST['stok'], $foto]);
     }
@@ -38,26 +38,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int)$_POST['ubah'];
         $s = $pdo->prepare('SELECT foto FROM produk WHERE id = ?');
         $s->execute([$id]);
-        $lama = $s->fetchColumn();
-        $foto = $lama === false ? null : $lama;
+        $foto = $s->fetchColumn();
+        if ($foto === false) $foto = null;
 
-        if (!empty($_POST['hapus_foto'])) {          // centang "hapus foto"
-            hapus_foto($lama);
+        if (!empty($_POST['hapus_foto'])) {                    // centang "hapus foto"
             $foto = null;
-        }
-        if ($baru = simpan_foto($_FILES['foto'] ?? null)) {   // upload foto pengganti
-            hapus_foto($lama);
-            $foto = $baru;
+        } elseif ($link = simpan_link($_POST['foto_url'] ?? '')) {  // link foto baru
+            $foto = $link;
         }
         $pdo->prepare('UPDATE produk SET kategori_id = ?, nama = ?, merek = ?, spesifikasi = ?, harga = ?, stok = ?, foto = ? WHERE id = ?')
             ->execute([(int)$_POST['kategori_id'], trim($_POST['nama']), trim($_POST['merek']), trim($_POST['spesifikasi']), (int)$_POST['harga'], (int)$_POST['stok'], $foto, $id]);
     }
     if (isset($_POST['hapus'])) {
-        $id = (int)$_POST['hapus'];
-        $s = $pdo->prepare('SELECT foto FROM produk WHERE id = ?');
-        $s->execute([$id]);
-        hapus_foto($s->fetchColumn());
-        $pdo->prepare('DELETE FROM produk WHERE id = ?')->execute([$id]);
+        $pdo->prepare('DELETE FROM produk WHERE id = ?')->execute([(int)$_POST['hapus']]);
     }
     if (isset($_POST['status'])) {
         $st = in_array($_POST['status_baru'], ['baru', 'diproses', 'selesai'], true) ? $_POST['status_baru'] : 'baru';
@@ -85,10 +78,15 @@ head('Admin');
   <a href="?tab=pesanan" class="<?= $tab === 'pesanan' ? 'on' : '' ?>">Pesanan</a>
 </div>
 
+<?php if (!empty($_SESSION['flash'])): ?>
+  <div class="pesan"><?= e($_SESSION['flash']) ?></div>
+  <?php unset($_SESSION['flash']); ?>
+<?php endif; ?>
+
 <?php if ($tab === 'produk'): ?>
 
   <?php if ($edit): ?>
-  <form method="post" enctype="multipart/form-data" class="panel form-grid dua">
+  <form method="post" class="panel form-grid dua">
     <h2 style="grid-column:1/-1">Edit produk #<?= (int)$edit['id'] ?></h2>
     <label>Nama <input name="nama" required value="<?= e($edit['nama']) ?>"></label>
     <label>Merek <input name="merek" required value="<?= e($edit['merek']) ?>"></label>
@@ -102,7 +100,7 @@ head('Admin');
     <label>Stok <input type="number" name="stok" min="0" required value="<?= (int)$edit['stok'] ?>"></label>
     <div style="grid-column:1/-1">
       <?php if ($edit['foto']): ?>
-        <img src="uploads/<?= e($edit['foto']) ?>" alt="Foto saat ini" style="width:120px;height:120px;object-fit:cover;border-radius:10px;display:block;margin-bottom:8px">
+        <img src="<?= e($edit['foto']) ?>" alt="Foto saat ini" style="width:120px;height:120px;object-fit:cover;border-radius:10px;display:block;margin-bottom:8px">
         <label style="display:flex;gap:8px;align-items:center;font-weight:400">
           <input type="checkbox" name="hapus_foto" value="1" style="width:auto"> Hapus foto ini
         </label>
@@ -110,8 +108,8 @@ head('Admin');
         <p class="kat" style="margin:0 0 8px">Belum ada foto.</p>
       <?php endif; ?>
     </div>
-    <label style="grid-column:1/-1">Ganti foto (JPG/PNG/WEBP, maks 2 MB; kosongkan jika tidak diganti)
-      <input type="file" name="foto" accept="image/jpeg,image/png,image/webp">
+    <label style="grid-column:1/-1">Link foto (https://...)
+      <input type="url" name="foto_url" maxlength="500" placeholder="https://contoh.com/gambar.jpg" value="<?= preg_match('#^https?://#i', (string)$edit['foto']) ? e($edit['foto']) : '' ?>">
     </label>
     <div style="grid-column:1/-1;display:flex;gap:8px">
       <button class="btn" name="ubah" value="<?= (int)$edit['id'] ?>">Simpan perubahan</button>
@@ -119,7 +117,7 @@ head('Admin');
     </div>
   </form>
   <?php else: ?>
-  <form method="post" enctype="multipart/form-data" class="panel form-grid dua">
+  <form method="post" class="panel form-grid dua">
     <h2 style="grid-column:1/-1">Tambah produk</h2>
     <label>Nama <input name="nama" required></label>
     <label>Merek <input name="merek" required></label>
@@ -131,7 +129,7 @@ head('Admin');
     <label>Spesifikasi <input name="spesifikasi"></label>
     <label>Harga (Rp) <input type="number" name="harga" min="0" required></label>
     <label>Stok <input type="number" name="stok" min="0" value="0" required></label>
-    <label style="grid-column:1/-1">Foto (JPG/PNG/WEBP, maks 2 MB) <input type="file" name="foto" accept="image/jpeg,image/png,image/webp"></label>
+    <label style="grid-column:1/-1">Link foto (https://...) <input type="url" name="foto_url" maxlength="500" placeholder="https://contoh.com/gambar.jpg"></label>
     <div><button class="btn" name="tambah" value="1">Tambah produk</button></div>
   </form>
   <?php endif; ?>
@@ -145,7 +143,7 @@ head('Admin');
         <td>
           <div style="display:flex;gap:10px;align-items:center">
             <?php if ($p['foto']): ?>
-              <img src="uploads/<?= e($p['foto']) ?>" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px">
+              <img src="<?= e($p['foto']) ?>" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px">
             <?php endif; ?>
             <div><strong><?= e($p['nama']) ?></strong><br><span class="kat"><?= e($p['merek']) ?></span></div>
           </div>

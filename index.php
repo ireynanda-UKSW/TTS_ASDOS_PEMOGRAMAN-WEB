@@ -54,7 +54,7 @@ head('Katalog');
   <?php foreach ($produk as $p): ?>
   <article class="card">
     <?php if ($p['foto']): ?>
-      <img class="foto" src="uploads/<?= e($p['foto']) ?>" alt="<?= e($p['nama']) ?>" loading="lazy">
+      <img class="foto" src="<?= e($p['foto']) ?>" alt="<?= e($p['nama']) ?>" loading="lazy">
     <?php else: ?>
       <div class="thumb"><?= e($p['merek']) ?></div>
     <?php endif; ?>
