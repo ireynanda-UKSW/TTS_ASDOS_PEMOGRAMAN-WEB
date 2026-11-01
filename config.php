@@ -17,6 +17,10 @@ $pdo = new PDO(
     [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
 );
 
+if (!$pdo->query("SHOW COLUMNS FROM produk LIKE 'foto'")->fetch()) {
+    $pdo->exec('ALTER TABLE produk ADD foto VARCHAR(500) NULL AFTER spesifikasi');
+}
+
 function e($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function rp($n) { return 'Rp ' . number_format((float)$n, 0, ',', '.'); }
 function jumlah_keranjang() { return array_sum($_SESSION['cart'] ?? []); }
