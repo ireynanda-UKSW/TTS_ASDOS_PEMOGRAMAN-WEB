@@ -30,15 +30,34 @@ $tab = ($_GET['tab'] ?? 'produk') === 'pesanan' ? 'pesanan' : 'produk';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['tambah'])) {
-        $pdo->prepare('INSERT INTO produk (kategori_id, nama, merek, spesifikasi, harga, stok) VALUES (?,?,?,?,?,?)')
-            ->execute([(int)$_POST['kategori_id'], trim($_POST['nama']), trim($_POST['merek']), trim($_POST['spesifikasi']), (int)$_POST['harga'], (int)$_POST['stok']]);
+        $foto = simpan_foto($_FILES['foto'] ?? null);
+        $pdo->prepare('INSERT INTO produk (kategori_id, nama, merek, spesifikasi, harga, stok, foto) VALUES (?,?,?,?,?,?,?)')
+            ->execute([(int)$_POST['kategori_id'], trim($_POST['nama']), trim($_POST['merek']), trim($_POST['spesifikasi']), (int)$_POST['harga'], (int)$_POST['stok'], $foto]);
+    }
+    if (isset($_POST['ubah'])) {
+        $id = (int)$_POST['ubah'];
+        $s = $pdo->prepare('SELECT foto FROM produk WHERE id = ?');
+        $s->execute([$id]);
+        $lama = $s->fetchColumn();
+        $foto = $lama === false ? null : $lama;
+
+        if (!empty($_POST['hapus_foto'])) {          // centang "hapus foto"
+            hapus_foto($lama);
+            $foto = null;
+        }
+        if ($baru = simpan_foto($_FILES['foto'] ?? null)) {   // upload foto pengganti
+            hapus_foto($lama);
+            $foto = $baru;
+        }
+        $pdo->prepare('UPDATE produk SET kategori_id = ?, nama = ?, merek = ?, spesifikasi = ?, harga = ?, stok = ?, foto = ? WHERE id = ?')
+            ->execute([(int)$_POST['kategori_id'], trim($_POST['nama']), trim($_POST['merek']), trim($_POST['spesifikasi']), (int)$_POST['harga'], (int)$_POST['stok'], $foto, $id]);
     }
     if (isset($_POST['hapus'])) {
-        $pdo->prepare('DELETE FROM produk WHERE id = ?')->execute([(int)$_POST['hapus']]);
-    }
-    if (isset($_POST['simpan'])) {
-        $pdo->prepare('UPDATE produk SET harga = ?, stok = ? WHERE id = ?')
-            ->execute([(int)$_POST['harga'], (int)$_POST['stok'], (int)$_POST['simpan']]);
+        $id = (int)$_POST['hapus'];
+        $s = $pdo->prepare('SELECT foto FROM produk WHERE id = ?');
+        $s->execute([$id]);
+        hapus_foto($s->fetchColumn());
+        $pdo->prepare('DELETE FROM produk WHERE id = ?')->execute([$id]);
     }
     if (isset($_POST['status'])) {
         $st = in_array($_POST['status_baru'], ['baru', 'diproses', 'selesai'], true) ? $_POST['status_baru'] : 'baru';
@@ -49,6 +68,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $kategori = $pdo->query('SELECT * FROM kategori ORDER BY id')->fetchAll();
+
+// Mode edit: ?tab=produk&edit=ID
+$edit = null;
+if ($tab === 'produk' && isset($_GET['edit'])) {
+    $s = $pdo->prepare('SELECT * FROM produk WHERE id = ?');
+    $s->execute([(int)$_GET['edit']]);
+    $edit = $s->fetch() ?: null;
+}
+
 head('Admin');
 ?>
 <h1>Admin <a class="btn ghost small" href="?keluar=1">Keluar</a></h1>
@@ -58,7 +86,40 @@ head('Admin');
 </div>
 
 <?php if ($tab === 'produk'): ?>
-  <form method="post" class="panel form-grid dua">
+
+  <?php if ($edit): ?>
+  <form method="post" enctype="multipart/form-data" class="panel form-grid dua">
+    <h2 style="grid-column:1/-1">Edit produk #<?= (int)$edit['id'] ?></h2>
+    <label>Nama <input name="nama" required value="<?= e($edit['nama']) ?>"></label>
+    <label>Merek <input name="merek" required value="<?= e($edit['merek']) ?>"></label>
+    <label>Kategori
+      <select name="kategori_id"><?php foreach ($kategori as $k): ?>
+        <option value="<?= $k['id'] ?>" <?= $k['id'] == $edit['kategori_id'] ? 'selected' : '' ?>><?= e($k['nama']) ?></option><?php endforeach; ?>
+      </select>
+    </label>
+    <label>Spesifikasi <input name="spesifikasi" value="<?= e($edit['spesifikasi']) ?>"></label>
+    <label>Harga (Rp) <input type="number" name="harga" min="0" required value="<?= (int)$edit['harga'] ?>"></label>
+    <label>Stok <input type="number" name="stok" min="0" required value="<?= (int)$edit['stok'] ?>"></label>
+    <div style="grid-column:1/-1">
+      <?php if ($edit['foto']): ?>
+        <img src="uploads/<?= e($edit['foto']) ?>" alt="Foto saat ini" style="width:120px;height:120px;object-fit:cover;border-radius:10px;display:block;margin-bottom:8px">
+        <label style="display:flex;gap:8px;align-items:center;font-weight:400">
+          <input type="checkbox" name="hapus_foto" value="1" style="width:auto"> Hapus foto ini
+        </label>
+      <?php else: ?>
+        <p class="kat" style="margin:0 0 8px">Belum ada foto.</p>
+      <?php endif; ?>
+    </div>
+    <label style="grid-column:1/-1">Ganti foto (JPG/PNG/WEBP, maks 2 MB; kosongkan jika tidak diganti)
+      <input type="file" name="foto" accept="image/jpeg,image/png,image/webp">
+    </label>
+    <div style="grid-column:1/-1;display:flex;gap:8px">
+      <button class="btn" name="ubah" value="<?= (int)$edit['id'] ?>">Simpan perubahan</button>
+      <a class="btn ghost" href="admin.php?tab=produk">Batal</a>
+    </div>
+  </form>
+  <?php else: ?>
+  <form method="post" enctype="multipart/form-data" class="panel form-grid dua">
     <h2 style="grid-column:1/-1">Tambah produk</h2>
     <label>Nama <input name="nama" required></label>
     <label>Merek <input name="merek" required></label>
@@ -70,8 +131,10 @@ head('Admin');
     <label>Spesifikasi <input name="spesifikasi"></label>
     <label>Harga (Rp) <input type="number" name="harga" min="0" required></label>
     <label>Stok <input type="number" name="stok" min="0" value="0" required></label>
+    <label style="grid-column:1/-1">Foto (JPG/PNG/WEBP, maks 2 MB) <input type="file" name="foto" accept="image/jpeg,image/png,image/webp"></label>
     <div><button class="btn" name="tambah" value="1">Tambah produk</button></div>
   </form>
+  <?php endif; ?>
 
   <div class="panel">
     <h2>Daftar produk</h2>
@@ -79,15 +142,22 @@ head('Admin');
       <tr><th>Produk</th><th>Harga</th><th>Stok</th><th></th></tr>
       <?php foreach ($pdo->query('SELECT * FROM produk ORDER BY id DESC') as $p): ?>
       <tr>
-        <form method="post">
-          <td><strong><?= e($p['nama']) ?></strong><br><span class="kat"><?= e($p['merek']) ?></span></td>
-          <td><input type="number" name="harga" value="<?= (int)$p['harga'] ?>" style="width:140px" aria-label="Harga"></td>
-          <td><input type="number" name="stok" value="<?= (int)$p['stok'] ?>" aria-label="Stok"></td>
-          <td style="white-space:nowrap">
-            <button class="btn small" name="simpan" value="<?= $p['id'] ?>">Simpan</button>
-            <button class="btn ghost small" name="hapus" value="<?= $p['id'] ?>" onclick="return confirm('Hapus produk ini?')">Hapus</button>
-          </td>
-        </form>
+        <td>
+          <div style="display:flex;gap:10px;align-items:center">
+            <?php if ($p['foto']): ?>
+              <img src="uploads/<?= e($p['foto']) ?>" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px">
+            <?php endif; ?>
+            <div><strong><?= e($p['nama']) ?></strong><br><span class="kat"><?= e($p['merek']) ?></span></div>
+          </div>
+        </td>
+        <td><?= rp($p['harga']) ?></td>
+        <td><?= (int)$p['stok'] ?></td>
+        <td style="white-space:nowrap">
+          <form method="post" style="display:flex;gap:6px">
+            <a class="btn small" href="?tab=produk&edit=<?= (int)$p['id'] ?>">Edit</a>
+            <button class="btn ghost small" name="hapus" value="<?= (int)$p['id'] ?>" onclick="return confirm('Hapus produk ini?')">Hapus</button>
+          </form>
+        </td>
       </tr>
       <?php endforeach; ?>
     </table>

@@ -53,7 +53,11 @@ head('Katalog');
 <section class="grid">
   <?php foreach ($produk as $p): ?>
   <article class="card">
-    <div class="thumb t<?= (int)$p['kategori_id'] ?>"><?= e($p['merek']) ?></div>
+    <?php if ($p['foto']): ?>
+      <img class="foto" src="uploads/<?= e($p['foto']) ?>" alt="<?= e($p['nama']) ?>" loading="lazy">
+    <?php else: ?>
+      <div class="thumb"><?= e($p['merek']) ?></div>
+    <?php endif; ?>
     <div class="body">
       <span class="kat"><?= e($p['kategori']) ?></span>
       <h3><?= e($p['nama']) ?></h3>
